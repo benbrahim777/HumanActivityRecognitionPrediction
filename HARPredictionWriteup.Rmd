@@ -1,0 +1,119 @@
+---
+title: ' HAR Prediction Assignment-Writeup'
+output:
+  html_document:
+    theme: cosmo
+---
+## Executive Summary  
+The writeup is about predicting the **Human Activity Recognition(HAR)** using the data from http://groupware.les.inf.puc-rio.br/har.**HAR** is when a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior. The goal of this project is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 subjects.
+The dataset has 5 classes : sitting,Sitting down,Standing, Standing up,Walking  
+
+## Getting data and setting work Environment  
+
+Installing the packages required for analysis  
+```{r,echo=TRUE}
+suppressWarnings(library(caret))
+suppressWarnings(library(randomForest))
+suppressWarnings(library(RCurl))
+```   
+
+
+```{r,echo=TRUE}
+#Reading data from URL
+data1 <- getURL("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",ssl.verifypeer=0L, followlocation=1L)
+training<-read.csv(text=data1)
+data2 <- getURL("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",ssl.verifypeer=0L, followlocation=1L)
+testing<-read.csv(text=data2)
+
+
+#training<-read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"))
+#testing<-read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"))
+dim(training);dim(testing)
+```  
+
+ 
+###Cleaning the data to get the required Variables    
+
+The  dataset has several columns with NA,missing and unknown values. Columns with large NA,missing and unknown values are removed . Also columns named **X, timestamp and window ** are removed. This helps in reducing the use of unnecessary variables.
+
+```{r,echo=TRUE}
+##Cleaning the training dataset
+training<-training[,colSums(is.na(training))==0]
+classe<-training$classe
+remove.coltrain<-grepl("^X|timestamp|window",names(training))
+trainclean<-training[,!remove.coltrain]
+trainclean<-trainclean[,sapply(trainclean,is.numeric)]
+trainclean$classe<-classe  
+
+##Cleaning the testing dataset
+testing<-testing[,colSums(is.na(testing))==0]
+remove.coltest<-grepl("^X|timestamp|window",names(testing))
+testclean<-testing[,!remove.coltest]
+testclean<-testclean[,sapply(testclean,is.numeric)]
+```  
+
+### Partitioning Data
+ The **training** dataset is partitioned into **train.data** and **test.data**   
+ 
+```{r,echo=TRUE}
+set.seed(21000) ## setting seed for ach resample is useful for parallel fits
+inTrain<-createDataPartition(y=trainclean$classe,p=0.7,list=FALSE)
+train.data<-trainclean[inTrain,]
+test.data<-trainclean[-inTrain,]
+```    
+
+## Model Building  
+
+A model is fit with the **"random forest"** method using 4- fold cross validation.  
+
+```{r,echo=TRUE}
+controlfit <- trainControl(method="cv", 4,allowParallel=TRUE)
+model <-train(classe ~ ., data=train.data, method="rf", trControl=controlfit, ntree=250)
+model
+```  
+
+### In Sample Error  
+
+```{r,echo=TRUE}
+train_pred<-predict(model,train.data)
+confusionMatrix(train_pred,train.data$classe)
+```  
+The accuracy is 100%.
+  
+### OutSample Error
+```{r,echo=TRUE}
+test_pred<-predict(model,test.data)
+confusionMatrix(test_pred,test.data$classe)
+```  
+The accuracy is 99.37%.   
+
+### For Submission script
+```{r,echo=TRUE}
+ans<-predict(model,testclean)
+answers<-as.character(ans)
+answers 
+```
+
+##Appendix  
+
+Random forests are very good in that it is an ensemble learning method used for classification and regression.  It uses multiple models for better performance that just using a single tree model. This can be particularly useful when  working with an extremely high number of candidate variables that need to be reduced.
+
+####Plot 1
+
+```{r,echo=FALSE}
+
+fit.rf = randomForest(classe~., data=train.data)
+par(mfrow=c(1, 2))
+plot(fit.rf)
+plot( importance(fit.rf), lty=2, pch=16)
+lines(importance(fit.rf))
+```
+
+
+
+
+
+
+
+
+
